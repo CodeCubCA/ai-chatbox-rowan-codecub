@@ -115,12 +115,19 @@ if prompt := st.chat_input("Ask me anything about gaming..."):
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": full_response})
 
-# Sidebar with personality selection and additional info
+# Sidebar with enhanced styling
 with st.sidebar:
-    st.header("⚙️ Settings")
+    # App branding
+    st.markdown("""
+        <div style='text-align: center; padding: 1rem 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; margin-bottom: 1.5rem;'>
+            <h1 style='color: white; margin: 0; font-size: 2rem;'>🎮</h1>
+            <p style='color: white; margin: 0.5rem 0 0 0; font-size: 0.9rem;'>Gaming AI Assistant</p>
+        </div>
+    """, unsafe_allow_html=True)
 
-    # Personality selection with emoji icons
-    st.subheader("🎭 AI Personality")
+    # Personality selection
+    st.markdown("### 🎭 AI Personality")
+
     personality_options = {
         "😊 Friendly": "Friendly",
         "👔 Professional": "Professional",
@@ -128,63 +135,118 @@ with st.sidebar:
     }
 
     selected_personality = st.radio(
-        "Choose how I should talk to you:",
+        "Choose conversation style:",
         options=list(personality_options.keys()),
         index=list(personality_options.values()).index(st.session_state.personality),
-        help="Select the AI's conversation style"
+        help="Select how the AI responds to you",
+        label_visibility="collapsed"
     )
 
     # Update personality if changed
     new_personality = personality_options[selected_personality]
     if new_personality != st.session_state.personality:
         st.session_state.personality = new_personality
-        st.success(f"Personality changed to {new_personality}! 🎉")
-        st.info("Clear chat history to see the new personality in action from the start!")
+        st.success(f"✨ Changed to {new_personality} mode!")
+        st.info("💡 Clear chat to apply from the start")
 
-    st.markdown("---")
-
-    # Personality descriptions
-    st.subheader("📝 Personality Guide")
-    st.markdown("""
-    **😊 Friendly**
-    Warm and friendly, chat like friends. Casual, supportive, and enthusiastic!
-
-    **👔 Professional**
-    Rigorous and professional. Accurate advice with expert knowledge.
-
-    **😄 Humorous**
-    Relaxed and humorous. Fun conversations with jokes and memes!
-    """)
-
-    st.markdown("---")
-
-    st.header("ℹ️ About")
-    st.markdown("""
-    This is a gaming-focused AI chatbot powered by:
-    - **Groq API** (llama-3.3-70b-versatile)
-    - **Streamlit** for the interface
-
-    Ask me about:
-    - 🎯 Game recommendations
-    - 💡 Gaming tips & strategies
-    - 📖 Game lore & stories
-    - 🏆 Achievement guides
-    - ⚔️ Build optimization
-    - And much more! 🎮
-    """)
-
-    st.markdown("---")
-
-    # Clear chat button with emoji
-    if st.button("🗑️ Clear Chat History"):
-        st.session_state.messages = []
-        welcome_messages = {
-            "Friendly": "Hey there, friend! 🎮 I'm so excited to chat with you about games! What's on your mind today? Need some tips, want to discuss your favorite game, or looking for something new to play? I'm all ears! 😊",
-            "Professional": "Greetings! 🎮 I am your professional gaming AI assistant. I'm here to provide you with accurate, well-researched gaming advice, strategies, and recommendations. How may I assist you today?",
-            "Humorous": "Yo, what's up gamer! 🎮 Ready to talk about games and have some laughs? I promise I won't rage quit on you (unlike that last boss fight, am I right? 😄). Hit me with your questions!"
+    # Personality descriptions in expandable section
+    with st.expander("📖 Personality Details", expanded=False):
+        st.markdown("""
+        <style>
+        .personality-card {
+            padding: 0.8rem;
+            border-radius: 8px;
+            margin-bottom: 0.8rem;
+            border-left: 4px solid;
         }
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": welcome_messages.get(st.session_state.personality, welcome_messages["Friendly"])
-        })
-        st.rerun()
+        .friendly { border-color: #48bb78; background-color: rgba(72, 187, 120, 0.1); }
+        .professional { border-color: #4299e1; background-color: rgba(66, 153, 225, 0.1); }
+        .humorous { border-color: #ed8936; background-color: rgba(237, 137, 54, 0.1); }
+        </style>
+
+        <div class='personality-card friendly'>
+            <strong>😊 Friendly</strong><br/>
+            Warm, casual, and supportive. Like chatting with a gaming buddy!
+        </div>
+
+        <div class='personality-card professional'>
+            <strong>👔 Professional</strong><br/>
+            Expert advice with accurate facts and proven strategies.
+        </div>
+
+        <div class='personality-card humorous'>
+            <strong>😄 Humorous</strong><br/>
+            Fun and entertaining with jokes, memes, and witty banter!
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # Chat controls
+    st.markdown("### ⚙️ Chat Controls")
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        if st.button("🗑️ Clear Chat History", use_container_width=True):
+            st.session_state.messages = []
+            welcome_messages = {
+                "Friendly": "Hey there, friend! 🎮 I'm so excited to chat with you about games! What's on your mind today? Need some tips, want to discuss your favorite game, or looking for something new to play? I'm all ears! 😊",
+                "Professional": "Greetings! 🎮 I am your professional gaming AI assistant. I'm here to provide you with accurate, well-researched gaming advice, strategies, and recommendations. How may I assist you today?",
+                "Humorous": "Yo, what's up gamer! 🎮 Ready to talk about games and have some laughs? I promise I won't rage quit on you (unlike that last boss fight, am I right? 😄). Hit me with your questions!"
+            }
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": welcome_messages.get(st.session_state.personality, welcome_messages["Friendly"])
+            })
+            st.rerun()
+
+    with col2:
+        message_count = len([m for m in st.session_state.messages if m["role"] == "user"])
+        st.metric("💬", message_count)
+
+    st.divider()
+
+    # What I can help with section
+    with st.expander("💡 What I Can Help With", expanded=False):
+        st.markdown("""
+        - 🎯 **Game Recommendations**
+          Find your next favorite game
+
+        - 💪 **Tips & Strategies**
+          Level up your gameplay
+
+        - 📖 **Lore & Stories**
+          Deep dive into game worlds
+
+        - 🏆 **Achievements**
+          Complete every challenge
+
+        - ⚔️ **Build Guides**
+          Optimize your character
+
+        - 🎮 **And much more!**
+          Just ask anything gaming-related
+        """)
+
+    st.divider()
+
+    # About section
+    with st.expander("ℹ️ About This App", expanded=False):
+        st.markdown("""
+        **Powered By:**
+        - 🚀 Groq API
+          `llama-3.3-70b-versatile`
+        - 🎨 Streamlit
+          Interactive UI framework
+
+        **Version:** 1.0.0
+        **Status:** 🟢 Online
+        """)
+
+    # Footer
+    st.markdown("---")
+    st.markdown("""
+        <div style='text-align: center; color: #888; font-size: 0.75rem;'>
+            Made with ❤️ for gamers
+        </div>
+    """, unsafe_allow_html=True)
