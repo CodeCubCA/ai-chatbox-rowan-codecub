@@ -1,13 +1,16 @@
 import streamlit as st
 import os
-from groq import Groq
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize Groq client with API key from environment variable
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# Configure Google Gemini API
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# Initialize Gemini model
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 # Page configuration
 st.set_page_config(
@@ -49,6 +52,10 @@ if "messages" not in st.session_state:
         "content": welcome_messages.get(st.session_state.personality, welcome_messages["Friendly"])
     })
 
+# Initialize chat session for Gemini
+if "chat_session" not in st.session_state:
+    st.session_state.chat_session = None
+
 # Display chat messages from history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -68,48 +75,48 @@ if prompt := st.chat_input("Ask me anything about gaming..."):
         message_placeholder = st.empty()
         full_response = ""
 
-        # Create messages array for API call with personality-based system prompt
+        # Create personality-based system prompt
         personality_prompts = {
             "Friendly": "You are a friendly and warm gaming AI assistant. Talk like a close friend who loves gaming. Be enthusiastic, supportive, and encouraging. Use casual language, show genuine interest, and celebrate the user's gaming achievements. Add appropriate emojis to make the conversation fun and welcoming. 😊🎮",
             "Professional": "You are a professional and rigorous gaming AI assistant. Provide accurate, well-researched advice with a formal tone. Focus on facts, statistics, and proven strategies. Be thorough and precise in your recommendations. Maintain a respectful and expert demeanor while avoiding slang or casual language. 🎯📊",
             "Humorous": "You are a humorous and entertaining gaming AI assistant. Make gaming discussions fun with jokes, witty comments, and playful banter. Use gaming memes, pop culture references, and light-hearted humor. Keep it relaxed and enjoyable while still being helpful. Don't be afraid to roast a little (playfully)! 😄🎮"
         }
 
-        api_messages = [
-            {
-                "role": "system",
-                "content": personality_prompts.get(st.session_state.personality, personality_prompts["Friendly"])
-            }
-        ]
+        system_prompt = personality_prompts.get(st.session_state.personality, personality_prompts["Friendly"])
 
-        # Add chat history to API messages
-        for msg in st.session_state.messages:
-            api_messages.append({
-                "role": msg["role"],
-                "content": msg["content"]
-            })
+        # Build conversation history for Gemini
+        conversation_history = []
+        for msg in st.session_state.messages[:-1]:  # Exclude the current user message
+            if msg["role"] == "user":
+                conversation_history.append({"role": "user", "parts": [msg["content"]]})
+            elif msg["role"] == "assistant":
+                conversation_history.append({"role": "model", "parts": [msg["content"]]})
 
-        # Call Groq API with streaming
+        # Call Google Gemini API with streaming
         try:
-            stream = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=api_messages,
-                temperature=0.7,
-                max_tokens=1024,
-                stream=True
-            )
+            # Create chat with history
+            chat = model.start_chat(history=conversation_history)
+
+            # Send message with system prompt prepended to first message
+            if len(conversation_history) == 0:
+                full_prompt = f"{system_prompt}\n\nUser: {prompt}"
+            else:
+                full_prompt = prompt
+
+            # Generate streaming response
+            response = chat.send_message(full_prompt, stream=True)
 
             # Stream the response
-            for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
-                    full_response += chunk.choices[0].delta.content
+            for chunk in response:
+                if chunk.text:
+                    full_response += chunk.text
                     message_placeholder.markdown(full_response + "▌")
 
             # Display final response
             message_placeholder.markdown(full_response)
 
         except Exception as e:
-            full_response = f"Error: {str(e)}\n\nPlease make sure your GROQ_API_KEY is set correctly in the .env file."
+            full_response = f"Error: {str(e)}\n\nPlease make sure your GEMINI_API_KEY is set correctly in the .env file."
             message_placeholder.markdown(full_response)
 
     # Add assistant response to chat history
@@ -189,6 +196,7 @@ with st.sidebar:
     with col1:
         if st.button("🗑️ Clear Chat History", use_container_width=True):
             st.session_state.messages = []
+            st.session_state.chat_session = None
             welcome_messages = {
                 "Friendly": "Hey there, friend! 🎮 I'm so excited to chat with you about games! What's on your mind today? Need some tips, want to discuss your favorite game, or looking for something new to play? I'm all ears! 😊",
                 "Professional": "Greetings! 🎮 I am your professional gaming AI assistant. I'm here to provide you with accurate, well-researched gaming advice, strategies, and recommendations. How may I assist you today?",
@@ -234,12 +242,12 @@ with st.sidebar:
     with st.expander("ℹ️ About This App", expanded=False):
         st.markdown("""
         **Powered By:**
-        - 🚀 Groq API
-          `llama-3.3-70b-versatile`
+        - 🤖 Google Gemini API
+          `gemini-2.0-flash`
         - 🎨 Streamlit
           Interactive UI framework
 
-        **Version:** 1.0.0
+        **Version:** 2.0.0
         **Status:** 🟢 Online
         """)
 
