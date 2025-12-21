@@ -1,16 +1,16 @@
 import streamlit as st
 import os
-import google.generativeai as genai
+from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure Google Gemini API
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Get HuggingFace API token
+HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
-# Initialize Gemini model
-model = genai.GenerativeModel('gemini-2.0-flash')
+# Initialize HuggingFace Inference Client
+client = InferenceClient(token=HUGGINGFACE_TOKEN)
 
 # Page configuration
 st.set_page_config(
@@ -52,9 +52,8 @@ if "messages" not in st.session_state:
         "content": welcome_messages.get(st.session_state.personality, welcome_messages["Friendly"])
     })
 
-# Initialize chat session for Gemini
-if "chat_session" not in st.session_state:
-    st.session_state.chat_session = None
+# Model selection for HuggingFace
+MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
 
 # Display chat messages from history
 for message in st.session_state.messages:
@@ -84,39 +83,43 @@ if prompt := st.chat_input("Ask me anything about gaming..."):
 
         system_prompt = personality_prompts.get(st.session_state.personality, personality_prompts["Friendly"])
 
-        # Build conversation history for Gemini
-        conversation_history = []
+        # Build conversation history for HuggingFace
+        messages = [
+            {"role": "system", "content": system_prompt}
+        ]
+
+        # Add conversation history
         for msg in st.session_state.messages[:-1]:  # Exclude the current user message
-            if msg["role"] == "user":
-                conversation_history.append({"role": "user", "parts": [msg["content"]]})
-            elif msg["role"] == "assistant":
-                conversation_history.append({"role": "model", "parts": [msg["content"]]})
+            messages.append({"role": msg["role"], "content": msg["content"]})
 
-        # Call Google Gemini API with streaming
+        # Add current user message
+        messages.append({"role": "user", "content": prompt})
+
+        # Call HuggingFace API with streaming
         try:
-            # Create chat with history
-            chat = model.start_chat(history=conversation_history)
-
-            # Send message with system prompt prepended to first message
-            if len(conversation_history) == 0:
-                full_prompt = f"{system_prompt}\n\nUser: {prompt}"
-            else:
-                full_prompt = prompt
-
             # Generate streaming response
-            response = chat.send_message(full_prompt, stream=True)
+            response = client.chat_completion(
+                messages=messages,
+                model=MODEL_NAME,
+                max_tokens=500,
+                stream=True
+            )
 
             # Stream the response
             for chunk in response:
-                if chunk.text:
-                    full_response += chunk.text
-                    message_placeholder.markdown(full_response + "▌")
+                if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
+                    if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
+                        if chunk.choices[0].delta.content:
+                            full_response += chunk.choices[0].delta.content
+                            message_placeholder.markdown(full_response + "▌")
 
             # Display final response
             message_placeholder.markdown(full_response)
 
         except Exception as e:
-            full_response = f"Error: {str(e)}\n\nPlease make sure your GEMINI_API_KEY is set correctly in the .env file."
+            import traceback
+            error_details = traceback.format_exc()
+            full_response = f"Error: {str(e)}\n\n```\n{error_details}\n```\n\nPlease make sure your HUGGINGFACE_TOKEN is set correctly in the .env file."
             message_placeholder.markdown(full_response)
 
     # Add assistant response to chat history
@@ -242,8 +245,8 @@ with st.sidebar:
     with st.expander("ℹ️ About This App", expanded=False):
         st.markdown("""
         **Powered By:**
-        - 🤖 Google Gemini API
-          `gemini-2.0-flash`
+        - 🤖 HuggingFace API
+          `meta-llama/Llama-3.2-3B-Instruct`
         - 🎨 Streamlit
           Interactive UI framework
 
