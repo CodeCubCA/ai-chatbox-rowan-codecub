@@ -12,6 +12,9 @@ HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 # Initialize HuggingFace Inference Client
 client = InferenceClient(token=HUGGINGFACE_TOKEN)
 
+# Model selection for HuggingFace - Using a model available on Serverless Inference
+MODEL_NAME = "microsoft/Phi-3-mini-4k-instruct"
+
 # Page configuration
 st.set_page_config(
     page_title="My Gaming AI Assistant",
@@ -95,23 +98,22 @@ if prompt := st.chat_input("Ask me anything about gaming..."):
         # Add current user message
         messages.append({"role": "user", "content": prompt})
 
-        # Call HuggingFace API with streaming
+        # Call HuggingFace API
         try:
-            # Generate streaming response
-            response = client.chat_completion(
-                messages=messages,
-                model=MODEL_NAME,
-                max_tokens=500,
-                stream=True
-            )
+            with st.spinner("🤔 Thinking..."):
+                # Generate response (non-streaming for better compatibility)
+                response = client.chat_completion(
+                    messages=messages,
+                    model=MODEL_NAME,
+                    max_tokens=500,
+                    stream=False
+                )
 
-            # Stream the response
-            for chunk in response:
-                if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
-                    if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
-                        if chunk.choices[0].delta.content:
-                            full_response += chunk.choices[0].delta.content
-                            message_placeholder.markdown(full_response + "▌")
+                # Extract the response content
+                if hasattr(response, 'choices') and len(response.choices) > 0:
+                    full_response = response.choices[0].message.content
+                else:
+                    full_response = "Sorry, I couldn't generate a response."
 
             # Display final response
             message_placeholder.markdown(full_response)
